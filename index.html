@@ -32,7 +32,7 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 .dot{position:absolute;right:8px;bottom:10px;width:6px;height:6px;border-radius:50%}
 .dot.has{background:var(--c)}.pad.hit .dot.has{background:#1b1a18}
 .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 12px)}
-.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0 8px}
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 8px}
 .tabs button{height:40px;border-radius:10px;background:transparent;color:var(--mute);font-weight:700;border:1px solid var(--line)}
 .tabs .on{background:var(--pad);color:var(--ink);border-color:transparent}
 .panel{background:var(--body);border-radius:16px;padding:12px;display:grid;gap:10px}
@@ -54,6 +54,16 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 .bpm button{width:48px;height:44px;border-radius:10px;background:var(--pad);font-size:20px}
 .bpm label{display:flex;gap:8px;align-items:center;color:var(--mute)}
 .bpm input{width:84px;height:44px;border-radius:10px;border:1px solid var(--line);background:#161513;color:var(--ink);font-size:20px;font-weight:700;text-align:center}
+.prog{height:6px;background:#161513;border-radius:3px;overflow:hidden}.prog i{display:block;height:100%;width:0;background:var(--hi)}.prog.rec i{background:var(--red)}
+.sel{display:flex;align-items:center;justify-content:center;gap:4px;min-height:44px;border-radius:10px;background:var(--pad);font-size:13px;color:var(--mute);padding:0 4px}
+.sel select{background:transparent;color:var(--ink);border:0;font-size:16px;font-weight:700;max-width:70px}
+.mix{display:grid;gap:4px}
+.mrow{display:grid;grid-template-columns:74px minmax(0,1fr) 40px 40px 40px;gap:6px;align-items:center;padding:4px;border-radius:10px}
+.mrow.arm{background:#3a2422;box-shadow:inset 0 0 0 1px var(--red)}
+.mname{background:transparent;text-align:left;min-height:40px;padding:0 6px;border-radius:8px;font-weight:700;display:flex;flex-direction:column;justify-content:center;line-height:1.15}
+.mname small{color:var(--mute);font-weight:500;font-size:12px}
+.mb{height:40px;border-radius:8px;background:var(--pad);font-weight:700}.mb.on{background:var(--hi);color:#1b1a18}
+.mrow input{accent-color:var(--hi);width:100%;margin:0}
 .hint,.foot{color:var(--mute);font-size:13px;margin:0}.foot{margin-top:12px;text-align:center}
 .sheet{position:fixed;inset:0;background:#000a;display:flex;align-items:flex-end;justify-content:center;padding:16px;z-index:9}
 .card{width:100%;max-width:480px;background:var(--body);border-radius:16px;padding:16px;display:grid;gap:12px;margin-bottom:env(safe-area-inset-bottom)}
@@ -71,7 +81,7 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
     <button id="orec" class="tbtn rec">● 出力録音</button>
   </header>
   <div id="pads" class="pads"></div>
-  <nav class="tabs"><button data-t="edit" class="on">編集</button><button data-t="seq">シーケンス</button></nav>
+  <nav class="tabs"><button data-t="edit" class="on">編集</button><button data-t="seq">ステップ</button><button data-t="loop">ルーパー</button></nav>
   <section id="edit" class="panel">
     <div class="ph"><span id="pname">-</span><small id="ptype"></small></div>
     <canvas id="wave"></canvas>
@@ -92,6 +102,18 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
     <div class="bpm"><button id="bm" aria-label="BPMを下げる">−</button><label>BPM <input id="bpm" type="number" inputmode="numeric" min="40" max="240"></label><button id="bp" aria-label="BPMを上げる">＋</button></div>
     <div class="row3"><button id="srec" class="tg">打込REC</button><button id="sclr" class="btn">パッド消去</button><button id="aclr" class="btn">全消去</button></div>
     <p class="hint">パッドを選んでステップをタップ。打込RECをオンにして再生中にパッドを叩くと、近いステップに記録されます。</p>
+  </section>
+  <section id="loop" class="panel" hidden>
+    <div class="ph"><span id="lpos">1.1</span><small id="linfo"></small></div>
+    <div id="prog" class="prog"><i id="lbar"></i></div>
+    <div class="row3"><button id="lrec" class="btn rec">● REC</button><button id="lundo" class="btn">直前を取消</button><button id="lmet" class="tg">メトロノーム</button></div>
+    <div class="row3">
+      <label class="sel">小節<select id="lbars"><option>1</option><option>2</option><option>4</option><option>8</option></select></label>
+      <label class="sel">吸着<select id="lq"><option value="0">なし</option><option value="0.25">1/16</option><option value="0.5">1/8</option><option value="1">1/4</option></select></label>
+      <button id="lcnt" class="tg">カウント</button>
+    </div>
+    <div id="mix" class="mix"></div>
+    <p class="hint">録音先のトラック名をタップして選び、RECを押します（停止中なら1小節カウントしてから開始）。ループしながら叩いた演奏が重なっていきます。M＝ミュート、S＝ソロ、✕＝2回タップで消去。</p>
   </section>
   <p class="foot">iPhoneで音が出ないときは、マナーモードを解除してください。</p>
 </div>
@@ -133,6 +155,10 @@ const def=i=>({name:KIT[i]?KIT[i][0]:'PAD '+(i+1),color:KIT[i]?KIT[i][1]:USERC,v
 const pads=Array.from({length:N},(_,i)=>Object.assign(def(i),{buf:null,_rb:null}));
 let pattern=Array.from({length:N},()=>Array(16).fill(0));
 let bpm=100,sel=0;
+const NT=6;
+const mkTrack=k=>({name:k<0?'STEP':'TR'+(k+1),ev:[],vol:1,mute:false,solo:false});
+let stepTr=mkTrack(-1),tracks=Array.from({length:NT},(_,k)=>mkTrack(k));
+let bars=2,quant=.25,metro=true,countIn=true,armT=0,recOn=false,takeId=0;
 
 /* ---------- 保存（IndexedDB） ---------- */
 const DB={db:null,
@@ -140,7 +166,8 @@ const DB={db:null,
  tx(m,f){return new Promise(res=>{if(!this.db)return res();try{const t=this.db.transaction('kv',m),r=f(t.objectStore('kv'));t.oncomplete=()=>res(r&&r.result);t.onerror=()=>res()}catch(e){res()}})},
  get(k){return this.tx('readonly',s=>s.get(k))},put(k,v){return this.tx('readwrite',s=>s.put(v,k))},del(k){return this.tx('readwrite',s=>s.delete(k))}};
 let saveT;
-const save=()=>{clearTimeout(saveT);saveT=setTimeout(()=>DB.put('state',{bpm,pattern,pads:pads.map(({name,color,vol,pitch,start,end,rev,loop,user})=>({name,color,vol,pitch,start,end,rev,loop,user}))}),300)};
+const save=()=>{clearTimeout(saveT);saveT=setTimeout(()=>DB.put('state',{bpm,pattern,bars,quant,metro,countIn,armT,
+ mix:[stepTr,...tracks].map(t=>({name:t.name,vol:t.vol,mute:t.mute,solo:t.solo,ev:t.ev.map(({p,b,k})=>({p,b,k}))})),pads:pads.map(({name,color,vol,pitch,start,end,rev,loop,user})=>({name,color,vol,pitch,start,end,rev,loop,user}))}),300)};
 const saveBuf=i=>{const b=pads[i].buf;DB.put('buf'+i,{sr:b.sampleRate,ch:[...Array(b.numberOfChannels)].map((_,c)=>b.getChannelData(c).slice())})};
 const mkBuf=(ch,sr)=>{const b=new AudioBuffer({length:Math.max(1,ch[0].length),numberOfChannels:ch.length,sampleRate:sr});ch.forEach((d,c)=>b.getChannelData(c).set(d));return b};
 const concat=a=>{let n=0;for(const x of a)n+=x.length;const o=new Float32Array(n);let k=0;for(const x of a){o.set(x,k);k+=x.length}return o};
@@ -166,11 +193,15 @@ const getBuf=p=>!p.buf?null:!p.rev?p.buf:(p._rb||(p._rb=revBuf(p.buf)));
 const region=p=>p.rev?[1-p.end,1-p.start]:[p.start,p.end];
 const voices=Array(N).fill(null);
 function stopVoice(i,t){const v=voices[i];if(!v)return;t=t||ctx.currentTime;v.g.gain.setTargetAtTime(0,t,.01);try{v.s.stop(t+.06)}catch(e){}voices[i]=null}
-function trigger(i,when,live){
+const buses=new Map();
+function bus(t){let g=buses.get(t);if(!g){g=ctx.createGain();g.connect(master);buses.set(t,g)}return g}
+function applyMix(){if(!ctx)return;const all=[stepTr,...tracks],solo=all.some(t=>t.solo);for(const t of all)bus(t).gain.setTargetAtTime((solo?t.solo:!t.mute)?t.vol:0,ctx.currentTime,.01)}
+function click(t,acc){const o=ctx.createOscillator(),g=ctx.createGain();o.type='square';o.frequency.value=acc?1600:1000;g.gain.setValueAtTime(acc?.22:.12,t);g.gain.exponentialRampToValueAtTime(.0001,t+.03);o.connect(g).connect(ctx.destination);o.start(t);o.stop(t+.04)}
+function trigger(i,when,live,dest){
  const p=pads[i],b=getBuf(p);if(!b||!ctx)return;
  if(p.loop&&voices[i]){stopVoice(i,when);if(live)return}
  const t=when||ctx.currentTime,s=ctx.createBufferSource(),g=ctx.createGain();
- s.buffer=b;s.playbackRate.value=2**(p.pitch/12);g.gain.value=p.vol;s.connect(g).connect(master);
+ s.buffer=b;s.playbackRate.value=2**(p.pitch/12);g.gain.value=p.vol;s.connect(g).connect(dest||master);
  const D=b.duration,[st,en]=region(p),off=st*D,len=Math.max(.005,(en-st)*D);
  if(p.loop){s.loop=true;s.loopStart=off;s.loopEnd=off+len;s.start(t,off)}else s.start(t,off,len);
  if(i===4&&!pads[4].user&&!pads[5].user)stopVoice(5,t);
@@ -188,6 +219,7 @@ padsEl.addEventListener('pointerdown',e=>{
  const b=e.target.closest('.pad');if(!b)return;e.preventDefault();ensure();
  const i=+b.dataset.i;trigger(i,0,true);if(pads[i].buf)flash(i,0);
  if(seqRec&&playing&&pads[i].buf){pattern[i][quantStep()]=1;save();renderDots()}
+ if(recOn&&playing&&pads[i].buf)recTap(i);
  if(i!==sel)select(i);else if(!$('#seq').hidden)renderSteps();
 });
 padsEl.addEventListener('contextmenu',e=>e.preventDefault());
@@ -283,7 +315,7 @@ $('#mic').onclick=async()=>{
 };
 
 /* ---------- シーケンサー ---------- */
-const stepsEl=$('#steps');let playing=false,seqRec=false,step=0,nextT=0,timer=null,q=[],last={s:-1,t:0},cur=-1;
+const stepsEl=$('#steps');let playing=false,seqRec=false,slot=0,nextT=0,timer=null,q=[],last={s:-1,g:0,t:0},cur=-1;
 function renderSteps(){
  $('#sname').textContent=pads[sel].name;
  stepsEl.innerHTML=pattern[sel].map((v,k)=>`<button class="st${v?' on':''}${k%4===0?' beat':''}${k===cur?' now':''}" data-k="${k}" aria-label="ステップ${k+1}"></button>`).join('');
@@ -292,16 +324,58 @@ function renderSteps(){
 stepsEl.addEventListener('click',e=>{const b=e.target.closest('.st');if(!b)return;const k=+b.dataset.k;pattern[sel][k]^=1;b.classList.toggle('on');renderDots();save()});
 const hl=s=>{cur=s;stepsEl.querySelectorAll('.st').forEach((b,k)=>b.classList.toggle('now',k===s))};
 function sched(){
- const spb=60/bpm/4;
+ const spb=60/bpm/4,LB=bars*4,NS=LB*4;
  while(nextT<ctx.currentTime+.12){
-  for(let i=0;i<N;i++)if(pattern[i][step]&&pads[i].buf){trigger(i,nextT,false);flash(i,nextT-ctx.currentTime)}
-  q.push({s:step,t:nextT});nextT+=spb;step=(step+1)%16;
+  const g=slot<0?slot:slot%NS,st=g<0?-1:g%16;
+  if(g>=0){
+   for(let i=0;i<N;i++)if(pattern[i][st]&&pads[i].buf){trigger(i,nextT,false,bus(stepTr));flash(i,nextT-ctx.currentTime)}
+   for(const tr of tracks)for(const e of tr.ev){const s4=e.b*4;if(s4>=g&&s4<g+1){const t=nextT+(s4-g)*spb;if(e.skip&&t<=e.skip)continue;if(pads[e.p].buf){trigger(e.p,t,false,bus(tr));flash(e.p,t-ctx.currentTime)}}}
+  }
+  if(metro&&((g%4+4)%4)===0)click(nextT,g<0||g%16===0);
+  q.push({s:st,g,t:nextT});nextT+=spb;slot++;
  }
 }
-const quantStep=()=>{const spb=60/bpm/4;return ctx.currentTime-last.t>spb/2?(last.s+1)%16:Math.max(0,last.s)};
-function startSeq(){ensure();playing=true;step=0;q=[];last={s:-1,t:ctx.currentTime};nextT=ctx.currentTime+.05;sched();timer=setInterval(sched,25);$('#play').textContent='■';$('#play').classList.add('on')}
-function stopSeq(){playing=false;clearInterval(timer);q=[];hl(-1);for(let i=0;i<N;i++)if(pads[i].loop)stopVoice(i);$('#play').textContent='▶';$('#play').classList.remove('on')}
-$('#play').onclick=()=>playing?stopSeq():startSeq();
+const quantStep=()=>{const spb=60/bpm/4;if(last.s<0)return 0;return ctx.currentTime-last.t>spb/2?(last.s+1)%16:last.s};
+function posNow(){const now=ctx.currentTime;let L=last;for(const e of q){if(e.t<=now)L=e;else break}return L.g+(now-L.t)/(60/bpm/4)}
+function recTap(i){
+ const LB=bars*4,NS=LB*4,spb=60/bpm/4;let g=posNow();
+ if(g<-.5)return; if(g<0)g=0;
+ const gl=g%NS;let b=gl/4;if(quant>0)b=Math.round(b/quant)*quant;b=((b%LB)+LB)%LB;
+ let d=b*4-gl;if(d<-NS/2)d+=NS;if(d>NS/2)d-=NS;
+ tracks[armT].ev.push({p:i,b,k:takeId,skip:ctx.currentTime+d*spb+.002});
+ save();if(!$('#loop').hidden)renderMix();
+}
+function startSeq(withCount){ensure();applyMix();playing=true;slot=withCount?-16:0;q=[];nextT=ctx.currentTime+.06;last={s:-1,g:slot,t:nextT};sched();timer=setInterval(sched,25);$('#play').textContent='■';$('#play').classList.add('on')}
+function stopSeq(){playing=false;clearInterval(timer);q=[];hl(-1);for(let i=0;i<N;i++)if(pads[i].loop)stopVoice(i);$('#play').textContent='▶';$('#play').classList.remove('on');recOn=false;updRec()}
+$('#play').onclick=()=>playing?stopSeq():startSeq(false);
+
+/* ---------- ルーパー ---------- */
+const mixEl=$('#mix');
+function renderMix(){
+ mixEl.innerHTML=[stepTr,...tracks].map((t,k)=>`<div class="mrow${k-1===armT?' arm':''}" data-k="${k}"><button class="mname" data-a="arm">${t.name}<small>${k?t.ev.length+'音':'ステップ'}</small></button><input type="range" min="0" max="150" value="${Math.round(t.vol*100)}" data-a="vol" aria-label="${t.name}の音量"><button class="mb${t.mute?' on':''}" data-a="m">M</button><button class="mb${t.solo?' on':''}" data-a="s">S</button><button class="mb" data-a="c" aria-label="${t.name}を消去">✕</button></div>`).join('');
+ $('#linfo').textContent='／'+bars+'小節・録音先 TR'+(armT+1);
+}
+const trOf=el=>{const k=+el.closest('.mrow').dataset.k;return [k,k?tracks[k-1]:stepTr]};
+mixEl.addEventListener('input',e=>{if(e.target.dataset.a!=='vol')return;const [,t]=trOf(e.target);t.vol=e.target.value/100;applyMix();save()});
+mixEl.addEventListener('click',e=>{
+ const b=e.target.closest('button');if(!b)return;const [k,t]=trOf(b),a=b.dataset.a;
+ if(a==='arm'){if(k)armT=k-1;else return}
+ else if(a==='m')t.mute=!t.mute;
+ else if(a==='s')t.solo=!t.solo;
+ else if(a==='c'){
+  if(!(b.dataset.c&&Date.now()-b.dataset.c<2000)){b.dataset.c=Date.now();b.textContent='消?';setTimeout(()=>{if(b.isConnected){b.textContent='✕';delete b.dataset.c}},2000);return}
+  if(k)t.ev=[];else{pattern.forEach(r=>r.fill(0));renderSteps();renderDots()}
+ }
+ applyMix();renderMix();save();
+});
+function updRec(){const b=$('#lrec');b.classList.toggle('on',recOn);b.textContent=recOn?'■ REC中':'● REC';$('#prog').classList.toggle('rec',recOn)}
+$('#lrec').onclick=()=>{ensure();if(recOn)recOn=false;else{recOn=true;takeId++;if(!playing)startSeq(countIn)}updRec()};
+$('#lundo').onclick=()=>{const t=tracks[armT];if(!t.ev.length){toast('TR'+(armT+1)+'に取り消す録音がありません');return}const k=Math.max(...t.ev.map(e=>e.k));t.ev=t.ev.filter(e=>e.k!==k);renderMix();save()};
+$('#lmet').onclick=()=>{metro=!metro;$('#lmet').classList.toggle('on',metro);save()};
+$('#lcnt').onclick=()=>{countIn=!countIn;$('#lcnt').classList.toggle('on',countIn);save()};
+$('#lbars').onchange=e=>{bars=+e.target.value;renderMix();save()};
+$('#lq').onchange=e=>{quant=+e.target.value;save()};
+function loopUI(){$('#lbars').value=bars;$('#lq').value=String(quant);$('#lmet').classList.toggle('on',metro);$('#lcnt').classList.toggle('on',countIn);renderMix();updRec()}
 const setBpm=v=>{bpm=Math.min(240,Math.max(40,Math.round(v)||100));$('#bpm').value=bpm;save()};
 $('#bpm').addEventListener('change',e=>setBpm(+e.target.value));
 $('#bm').onclick=()=>setBpm(bpm-1);$('#bp').onclick=()=>setBpm(bpm+1);
@@ -345,12 +419,14 @@ $('#orec').onclick=()=>{
 };
 
 /* ---------- その他 ---------- */
-document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));$('#edit').hidden=b.dataset.t!=='edit';$('#seq').hidden=b.dataset.t!=='seq';if(b.dataset.t==='edit')drawWave();else renderSteps()});
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));const t=b.dataset.t;for(const id of ['edit','seq','loop'])$('#'+id).hidden=t!==id;if(t==='edit')drawWave();else if(t==='seq')renderSteps();else renderMix()});
 let toastT;
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),3200)}
 const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 function frame(){
- if(ctx&&playing){const now=ctx.currentTime;let ch=false;while(q.length&&q[0].t<=now){last=q.shift();ch=true}if(ch&&!$('#seq').hidden)hl(last.s);else if(ch)cur=last.s}
+ if(ctx&&playing){const now=ctx.currentTime;let ch=false;while(q.length&&q[0].t<=now){last=q.shift();ch=true}if(ch&&!$('#seq').hidden)hl(last.s);else if(ch)cur=last.s;
+  if(!$('#loop').hidden){const NS=bars*16,g=posNow();if(g<0){$('#lpos').textContent='カウント '+(Math.floor((g+16)/4)+1);$('#lbar').style.width='0%'}else{const gl=g%NS;$('#lpos').textContent=(Math.floor(gl/16)+1)+'.'+(Math.floor(gl%16/4)+1);$('#lbar').style.width=(gl/NS*100)+'%'}}}
+ else if(!$('#loop').hidden&&$('#lpos').textContent!=='1.1'){$('#lpos').textContent='1.1';$('#lbar').style.width='0%'}
  if(micOn){drawWave();$('#mic').textContent='■ 停止 '+(micCount/ctx.sampleRate).toFixed(1)+'s'}
  if(outRec)$('#orec').textContent='■ '+fmt((performance.now()-orecT0)/1000);
  requestAnimationFrame(frame);
@@ -365,10 +441,12 @@ async function init(){
  const st=await DB.get('state');
  if(st){
   bpm=st.bpm||100;if(Array.isArray(st.pattern)&&st.pattern.length===N)pattern=st.pattern;
+  if(st.bars)bars=st.bars;if(st.quant!==undefined)quant=st.quant;if(st.metro!==undefined)metro=st.metro;if(st.countIn!==undefined)countIn=st.countIn;if(st.armT!==undefined)armT=st.armT;
+  if(Array.isArray(st.mix)&&st.mix.length===NT+1){const all=st.mix.map((m,k)=>Object.assign(mkTrack(k-1),m));stepTr=all[0];tracks=all.slice(1);buses.clear();takeId=Math.max(0,...tracks.flatMap(t=>t.ev.map(e=>e.k||0)))}
   for(let i=0;i<N;i++){const s=st.pads&&st.pads[i];if(!s)continue;Object.assign(pads[i],s);
    if(s.user){const r=await DB.get('buf'+i);if(r&&r.ch){pads[i].buf=mkBuf(r.ch,r.sr)}else Object.assign(pads[i],def(i),{buf:kitBufs[i]||null})}}
  }
- pads.forEach((_,i)=>padLabel(i));$('#bpm').value=bpm;renderDots();
+ pads.forEach((_,i)=>padLabel(i));$('#bpm').value=bpm;renderDots();loopUI();
  els[0].classList.add('sel');select(0);
  requestAnimationFrame(frame);
 }
